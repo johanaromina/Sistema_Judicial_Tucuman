@@ -1,0 +1,21 @@
+const resolverExpedienteId = async (input) => {
+    const value = input.trim();
+    if (!value) {
+      throw new Error('Debe indicar el expediente relacionado.');
+    }
+
+    if (/^\d+$/.test(value)) {
+      return value;
+    }
+
+    // Usar búsqueda rápida para autocompletar (más liviana)
+    const response = await expedientesApi.quickSearch({ query: value, limit: 5 });
+    const expedientes = response?.data?.expedientes || response?.expedientes || [];
+    const match = expedientes.find((exp) => exp.nro === value) || expedientes[0];
+
+    if (!match) {
+      throw new Error('No se encontró un expediente que coincida con el dato ingresado.');
+    }
+
+    return match.id;
+  };
