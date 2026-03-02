@@ -13,10 +13,10 @@ exports.seed = async function(knex) {
 
   // Insertar roles
   const rolesResult = await knex('roles').insert([
-    { nombre: 'admin' },
-    { nombre: 'juez' },
-    { nombre: 'secretario' },
-    { nombre: 'operador' }
+    { nombre: 'ADMIN' },
+    { nombre: 'JUEZ' },
+    { nombre: 'SECRETARIO' },
+    { nombre: 'OPERADOR' }
   ]);
 
   // Obtener los roles insertados
@@ -55,28 +55,28 @@ exports.seed = async function(knex) {
       nombre: 'Administrador del Sistema',
       email: 'admin@spjt.com',
       password_hash: passwordHash,
-      rol_id: roles.find(r => r.nombre === 'admin').id,
+      rol_id: roles.find(r => r.nombre === 'ADMIN').id,
       activo: true
     },
     {
       nombre: 'Dr. Juan Pérez',
       email: 'juez.perez@spjt.com',
       password_hash: passwordHash,
-      rol_id: roles.find(r => r.nombre === 'juez').id,
+      rol_id: roles.find(r => r.nombre === 'JUEZ').id,
       activo: true
     },
     {
       nombre: 'Lic. María González',
       email: 'secretaria.gonzalez@spjt.com',
       password_hash: passwordHash,
-      rol_id: roles.find(r => r.nombre === 'secretario').id,
+      rol_id: roles.find(r => r.nombre === 'SECRETARIO').id,
       activo: true
     },
     {
       nombre: 'Carlos Rodríguez',
       email: 'operador.rodriguez@spjt.com',
       password_hash: passwordHash,
-      rol_id: roles.find(r => r.nombre === 'operador').id,
+      rol_id: roles.find(r => r.nombre === 'OPERADOR').id,
       activo: true
     }
   ]);
@@ -93,7 +93,7 @@ exports.seed = async function(knex) {
       fuero: 'Civil y Comercial',
       estado: 'abierto',
       institucion_id: instituciones.find(i => i.tipo === 'Juzgado').id,
-      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'secretario').id).id
+      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'SECRETARIO').id).id
     },
     {
       nro: 'EXP-2024-002',
@@ -101,7 +101,7 @@ exports.seed = async function(knex) {
       fuero: 'Penal',
       estado: 'en_trámite',
       institucion_id: instituciones.find(i => i.tipo === 'Juzgado').id,
-      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'juez').id).id
+      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'JUEZ').id).id
     }
   ]);
 
@@ -116,14 +116,14 @@ exports.seed = async function(knex) {
       tipo: 'Presentación de demanda',
       descripcion: 'Se presenta demanda por daños y perjuicios',
       fecha: new Date('2024-01-15'),
-      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'secretario').id).id
+      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'SECRETARIO').id).id
     },
     {
       expediente_id: expedientes[1].id,
       tipo: 'Apertura de causa',
       descripcion: 'Se abre causa penal por robo',
       fecha: new Date('2024-01-20'),
-      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'juez').id).id
+      creado_por: users.find(u => u.rol_id === roles.find(r => r.nombre === 'JUEZ').id).id
     }
   ]);
 

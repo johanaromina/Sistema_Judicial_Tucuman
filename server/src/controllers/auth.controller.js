@@ -22,7 +22,9 @@ class AuthController {
         let roleName = rol || process.env.DEFAULT_ROLE || 'OPERADOR';
         // normalizar mayúsculas
         roleName = String(roleName).toUpperCase();
-        const roleRow = await db('roles').where({ nombre: roleName }).first();
+        const roleRow = await db('roles')
+          .whereRaw('UPPER(nombre) = ?', [roleName])
+          .first();
         if (!roleRow) {
           throw createError('Rol no válido', 400);
         }
