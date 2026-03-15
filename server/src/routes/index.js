@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { db } = require('../config/database');
 
 // Importar rutas específicas
 const authRoutes = require('./auth.routes');
@@ -26,6 +27,34 @@ router.use('/usuarios', usuariosRoutes);
 router.use('/auditoria', auditoriaRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/instituciones', institucionesRoutes);
+
+// Debug de roles para validar instancia/DB activa (solo desarrollo)
+router.get('/debug/roles', async (req, res, next) => {
+  try {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+
+    const roles = await db('roles')
+      .select('id', 'nombre')
+      .orderBy('id', 'asc');
+
+    return res.json({
+      success: true,
+      data: {
+        roles,
+        db: {
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '3306'),
+          name: process.env.DB_NAME || 'spjt_db'
+        },
+        env: process.env.NODE_ENV || 'development'
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 // Ruta de información de la API
 router.get('/', (req, res) => {

@@ -10,7 +10,6 @@ import {
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../hooks/useAuth';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme';
 import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
@@ -19,9 +18,11 @@ import { institucionesApi } from '../../api/instituciones.api';
 import { EXPEDIENTE_CONFIG } from '../../config/env';
 import { Modal } from 'react-native';
 
-const NuevoExpedienteScreen = ({ navigation }) => {
-  const { user, hasPermission } = useAuth();
+const NuevoExpedienteScreen = ({ route, navigation }) => {
+  const expedienteId = route?.params?.id || route?.params?.expedienteId;
+  const isEditing = route?.params?.mode === 'edit' || Boolean(expedienteId);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(isEditing);
   const generateNro = () => {
     const prefix = EXPEDIENTE_CONFIG?.PREFIX || 'EXP';
     const yearFmt = (EXPEDIENTE_CONFIG?.YEAR_FORMAT || 'YYYY').toUpperCase();
@@ -46,11 +47,28 @@ const NuevoExpedienteScreen = ({ navigation }) => {
   const [instQuery, setInstQuery] = useState('');
 
   React.useEffect(() => {
-    // Autogenerar nro al montar
-    setFormData(prev => ({ ...prev, nro: generateNro() }));
-    // Cargar instituciones
-    (async () => { await cargarInstituciones(); })();
-  }, []);
+    let isMounted = true;
+
+    const initialize = async () => {
+      if (!isEditing) {
+        setFormData(prev => ({ ...prev, nro: generateNro() }));
+      }
+
+      await cargarInstituciones();
+
+      if (isEditing && expedienteId) {
+        await cargarExpediente(expedienteId, isMounted);
+      } else if (isMounted) {
+        setInitialLoading(false);
+      }
+    };
+
+    initialize();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [expedienteId, isEditing]);
 
   const cargarInstituciones = async (search = '') => {
     try {
@@ -70,6 +88,39 @@ const NuevoExpedienteScreen = ({ navigation }) => {
     const t = setTimeout(() => { cargarInstituciones(instQuery); }, 300);
     return () => clearTimeout(t);
   }, [instQuery]);
+
+  const cargarExpediente = async (id, isMounted = true) => {
+    try {
+      setInitialLoading(true);
+      const expediente = await expedientesApi.getExpediente(id);
+
+      if (!isMounted || !expediente) {
+        return;
+      }
+
+      setFormData({
+        nro: expediente.nro || '',
+        caratula: expediente.caratula || '',
+        fuero: expediente.fuero || '',
+        institucion_id: expediente.institucion_id ? String(expediente.institucion_id) : '',
+        institucion_nombre: expediente.institucion_nombre || ''
+      });
+    } catch (error) {
+      if (!isMounted) {
+        return;
+      }
+
+      Alert.alert(
+        'Error',
+        error?.response?.data?.message || error?.message || 'No se pudo cargar el expediente'
+      );
+      navigation.goBack();
+    } finally {
+      if (isMounted) {
+        setInitialLoading(false);
+      }
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -104,45 +155,67 @@ const NuevoExpedienteScreen = ({ navigation }) => {
     setLoading(true);
     try {
       const payload = {
-        nro: formData.nro.trim(),
         caratula: formData.caratula.trim(),
         fuero: formData.fuero.trim(),
         institucion_id: formData.institucion_id || undefined,
       };
-      const res = await expedientesApi.crearExpediente(payload);
+      if (!isEditing) {
+        payload.nro = formData.nro.trim();
+      }
+
+      const res = isEditing
+        ? await expedientesApi.actualizarExpediente(expedienteId, payload)
+        : await expedientesApi.crearExpediente(payload);
       const ok = res?.success !== false;
       const created = res?.data?.expediente || res?.data?.data?.expediente || res?.expediente;
       if (ok && created?.id) {
-        // Ofrecer opciones de navegación (en Web usar confirm)
-        if (Platform.OS === 'web') {
-          try {
-            const goList = window.confirm(`Expediente creado\nN° ${created.nro}\n\n¿Ir a la lista? (Cancelar: Ver detalle)`);
-            if (goList) {
-              navigation.navigate('Main', { screen: 'MainTabs', params: { screen: 'Expedientes', params: { toast: 'Expediente creado', highlightId: created.id } } });
-            } else {
-              navigation.navigate('ExpedienteDetail', { id: created.id });
-            }
-          } catch {
+        if (isEditing) {
+          if (Platform.OS === 'web') {
+            try { window.alert(`Expediente actualizado\nN° ${created.nro}`); } catch {}
             navigation.navigate('ExpedienteDetail', { id: created.id });
+          } else {
+            Alert.alert(
+              'Expediente actualizado',
+              `N° ${created.nro}`,
+              [{ text: 'Aceptar', onPress: () => navigation.navigate('ExpedienteDetail', { id: created.id }) }]
+            );
           }
         } else {
-          Alert.alert(
-            'Expediente creado',
-            `N° ${created.nro}\n¿Qué deseas hacer ahora?`,
-            [
-              { text: 'Ir a la lista', onPress: () => navigation.navigate('Main', { screen: 'MainTabs', params: { screen: 'Expedientes', params: { toast: 'Expediente creado', highlightId: created.id } } }) },
-              { text: 'Ver detalle', onPress: () => navigation.navigate('ExpedienteDetail', { id: created.id }) }
-            ]
-          );
+          // Ofrecer opciones de navegación (en Web usar confirm)
+          if (Platform.OS === 'web') {
+            try {
+              const goList = window.confirm(`Expediente creado\nN° ${created.nro}\n\n¿Ir a la lista? (Cancelar: Ver detalle)`);
+              if (goList) {
+                navigation.navigate('Main', { screen: 'MainTabs', params: { screen: 'Expedientes', params: { toast: 'Expediente creado', highlightId: created.id } } });
+              } else {
+                navigation.navigate('ExpedienteDetail', { id: created.id });
+              }
+            } catch {
+              navigation.navigate('ExpedienteDetail', { id: created.id });
+            }
+          } else {
+            Alert.alert(
+              'Expediente creado',
+              `N° ${created.nro}\n¿Qué deseas hacer ahora?`,
+              [
+                { text: 'Ir a la lista', onPress: () => navigation.navigate('Main', { screen: 'MainTabs', params: { screen: 'Expedientes', params: { toast: 'Expediente creado', highlightId: created.id } } }) },
+                { text: 'Ver detalle', onPress: () => navigation.navigate('ExpedienteDetail', { id: created.id }) }
+              ]
+            );
+          }
         }
       } else if (ok) {
-        // Fallback: ir a la lista con toast
-        navigation.navigate('MainTabs', { screen: 'Expedientes', params: { toast: 'Expediente creado' } });
+        if (isEditing) {
+          navigation.navigate('ExpedienteDetail', { id: expedienteId });
+        } else {
+          // Fallback: ir a la lista con toast
+          navigation.navigate('MainTabs', { screen: 'Expedientes', params: { toast: 'Expediente creado' } });
+        }
       } else {
-        throw new Error(res?.message || 'No se pudo crear el expediente');
+        throw new Error(res?.message || `No se pudo ${isEditing ? 'actualizar' : 'crear'} el expediente`);
       }
     } catch (error) {
-      const msg = error?.response?.data?.message || error?.message || 'Error al crear el expediente';
+      const msg = error?.response?.data?.message || error?.message || `Error al ${isEditing ? 'actualizar' : 'crear'} el expediente`;
       Alert.alert('Error', msg);
     } finally {
       setLoading(false);
@@ -155,6 +228,15 @@ const NuevoExpedienteScreen = ({ navigation }) => {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
+
+  if (initialLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="hourglass" size={48} color={COLORS.primary} />
+        <Text style={styles.loadingText}>Cargando expediente...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -171,14 +253,16 @@ const NuevoExpedienteScreen = ({ navigation }) => {
         />
         
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Nuevo Expediente</Text>
+          <Text style={styles.headerTitle}>{isEditing ? 'Editar Expediente' : 'Nuevo Expediente'}</Text>
           <Text style={styles.headerSubtitle}>Poder Judicial de Tucumán</Text>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>Información del Expediente</Text>
+          <Text style={styles.formTitle}>
+            {isEditing ? 'Actualizar información del expediente' : 'Información del Expediente'}
+          </Text>
           
           <AppInput
             label="Número de Expediente"
@@ -187,12 +271,21 @@ const NuevoExpedienteScreen = ({ navigation }) => {
             onChangeText={(value) => handleInputChange('nro', value)}
             error={errors.nro}
             leftIcon="document"
+            disabled={isEditing}
           />
-          <View style={{ alignItems: 'flex-end', marginTop: -SPACING.sm, marginBottom: SPACING.sm }}>
-            <TouchableOpacity onPress={() => setFormData(prev => ({ ...prev, nro: generateNro() }))}>
-              <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.primary, fontWeight: '600' }}>Regenerar número</Text>
-            </TouchableOpacity>
-          </View>
+          {isEditing ? (
+            <View style={{ alignItems: 'flex-end', marginTop: -SPACING.sm, marginBottom: SPACING.sm }}>
+              <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.text.secondary }}>
+                El número del expediente no se puede modificar.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ alignItems: 'flex-end', marginTop: -SPACING.sm, marginBottom: SPACING.sm }}>
+              <TouchableOpacity onPress={() => setFormData(prev => ({ ...prev, nro: generateNro() }))}>
+                <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.primary, fontWeight: '600' }}>Regenerar número</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           
           <AppInput
             label="Carátula"
@@ -236,7 +329,7 @@ const NuevoExpedienteScreen = ({ navigation }) => {
             />
             
             <AppButton
-              title="Crear Expediente"
+              title={isEditing ? 'Guardar cambios' : 'Crear Expediente'}
               onPress={handleSubmit}
               loading={loading}
               style={styles.submitButton}
@@ -299,6 +392,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+    padding: SPACING.screenPadding,
+  },
+
+  loadingText: {
+    ...TYPOGRAPHY.body1,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.md,
   },
   
   header: {

@@ -31,7 +31,7 @@ export const expedientesApi = {
 
   // Actualizar expediente
   actualizarExpediente: async (id, expediente) => {
-    const response = await api.put(`/expedientes/${id}`, expediente);
+    const response = await api.patch(`/expedientes/${id}`, expediente);
     return response.data;
   },
 

@@ -21,14 +21,8 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme
 const ROLES_JUDICIALES = [
   { value: 'ADMIN', label: 'Administrador del Sistema' },
   { value: 'JUEZ', label: 'Juez' },
-  { value: 'ABOGADO', label: 'Abogado' },
-  { value: 'ESCRIBANO', label: 'Escribano' },
   { value: 'SECRETARIO', label: 'Secretario Judicial' },
   { value: 'OPERADOR', label: 'Operador Administrativo' },
-  { value: 'AUXILIAR', label: 'Auxiliar Judicial' },
-  { value: 'PROCURADOR', label: 'Procurador' },
-  { value: 'DEFENSOR', label: 'Defensor Oficial' },
-  { value: 'FISCAL', label: 'Fiscal' },
 ];
 
 const CrearUsuarioScreen = ({ navigation }) => {
@@ -128,7 +122,11 @@ const CrearUsuarioScreen = ({ navigation }) => {
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
-      const message = error?.response?.data?.message || 'No se pudo crear el usuario. Intente nuevamente.';
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        'No se pudo crear el usuario. Intente nuevamente.';
       Alert.alert('Error', message);
     } finally {
       setLoading(false);

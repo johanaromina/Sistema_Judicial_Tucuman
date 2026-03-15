@@ -1,7 +1,21 @@
+const resolveApiBaseUrl = () => {
+  const publicBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (publicBaseUrl) {
+    return publicBaseUrl;
+  }
+
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+    return `${protocol}//${window.location.hostname}:3001/api/v1`;
+  }
+
+  return 'http://localhost:3001/api/v1';
+};
+
 // Configuración del entorno de la aplicación SPJT
 export const ENV = {
   // Configuración de la API
-  API_BASE_URL: 'http://192.168.100.9:3001/api/v1',
+  API_BASE_URL: resolveApiBaseUrl(),
   
   // Configuración de la aplicación
   APP_NAME: 'SPJT - Sistema de Procesos Judiciales',

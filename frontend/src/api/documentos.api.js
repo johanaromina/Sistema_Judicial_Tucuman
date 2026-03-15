@@ -20,9 +20,10 @@ export const documentosApi = {
     }
 
     const formData = new FormData();
+    const webFile = archivo.file;
 
-    if (archivo.file) {
-      formData.append('documento', archivo.file, archivo.name || archivo.file?.name || 'documento.pdf');
+    if (webFile) {
+      formData.append('documento', webFile, archivo.name || webFile.name || 'documento.pdf');
     } else {
       formData.append('documento', {
         uri: archivo.uri,
@@ -38,9 +39,7 @@ export const documentosApi = {
     if (datos.tipo) formData.append('tipo', datos.tipo);
     if (datos.actuacion_id) formData.append('actuacion_id', datos.actuacion_id);
 
-    const response = await api.post('/documentos', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post('/documentos', formData);
     return response.data;
   },
 

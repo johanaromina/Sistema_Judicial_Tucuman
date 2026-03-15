@@ -34,7 +34,7 @@ const ExpedientesListScreen = ({ navigation }) => {
   const { data: expedientes, isLoading, error, refetch } = useQuery({
     queryKey: ['expedientes', searchQuery, selectedFilter],
     queryFn: () => expedientesApi.getExpedientes({
-      search: searchQuery,
+      query: searchQuery,
       estado: selectedFilter === 'todos' ? undefined : selectedFilter
     }),
     staleTime: 5 * 60 * 1000, // 5 minutos
@@ -85,6 +85,14 @@ const ExpedientesListScreen = ({ navigation }) => {
 
   const handleExpedientePress = (expediente) => {
     navigation.navigate('ExpedienteDetail', { id: expediente.id });
+  };
+
+  const handleEditarExpediente = (expediente) => {
+    if (hasPermission('expedientes.write')) {
+      navigation.navigate('NuevoExpediente', { id: expediente.id, mode: 'edit' });
+    } else {
+      Alert.alert('Acceso Denegado', 'No tienes permisos para editar expedientes.');
+    }
   };
 
   const handleNuevoExpediente = () => {
@@ -163,13 +171,25 @@ const ExpedientesListScreen = ({ navigation }) => {
       </View>
       
       <View style={styles.cardActions}>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            handleExpedientePress(expediente);
+          }}
+        >
           <Ionicons name="eye" size={20} color={COLORS.primary} />
           <Text style={styles.actionButtonText}>Ver</Text>
         </TouchableOpacity>
         
         {hasPermission('expedientes.write') && (
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              handleEditarExpediente(expediente);
+            }}
+          >
             <Ionicons name="create" size={20} color={COLORS.secondary} />
             <Text style={styles.actionButtonText}>Editar</Text>
           </TouchableOpacity>

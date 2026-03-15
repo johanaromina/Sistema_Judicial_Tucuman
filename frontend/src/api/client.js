@@ -16,6 +16,17 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
+      const isFormDataRequest =
+        typeof FormData !== 'undefined' && config?.data instanceof FormData;
+
+      if (isFormDataRequest) {
+        if (typeof config.headers?.set === 'function') {
+          config.headers.set('Content-Type', undefined);
+        } else if (config.headers) {
+          delete config.headers['Content-Type'];
+        }
+      }
+
       let token = await AsyncStorage.getItem('auth_token');
       // Fallback para Web: usar localStorage si no hay token en AsyncStorage
       if (!token && typeof window !== 'undefined' && window.localStorage) {

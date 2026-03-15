@@ -16,6 +16,7 @@ const HomeScreen = lazy(() => import('../screens/home/HomeScreen'));
 const ExpedientesListScreen = lazy(() => import('../screens/home/ExpedientesListScreen'));
 const ExpedienteDetailScreen = lazy(() => import('../screens/home/ExpedienteDetailScreen'));
 const NuevoExpedienteScreen = lazy(() => import('../screens/home/NuevoExpedienteScreen'));
+const NuevaActuacionScreen = lazy(() => import('../screens/home/NuevaActuacionScreen'));
 const DocumentosScreen = lazy(() => import('../screens/docs/DocumentosScreen'));
 const SubirDocumentoScreen = lazy(() => import('../screens/docs/SubirDocumentoScreen'));
 const FirmarDocumentoScreen = lazy(() => import('../screens/docs/FirmarDocumentoScreen'));
@@ -245,6 +246,7 @@ const AppNavigator = () => {
                   }),
                 }}
               />
+              <Stack.Screen name="NuevaActuacion" component={NuevaActuacionScreen} />
               <Stack.Screen name="Perfil" component={PerfilScreen} />
               <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
               <Stack.Screen name="EditProfile" component={EditProfileScreen} />

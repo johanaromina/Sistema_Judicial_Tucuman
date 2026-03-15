@@ -20,15 +20,39 @@ class AuthController {
       let roleId = rol_id;
       if (!roleId) {
         let roleName = rol || process.env.DEFAULT_ROLE || 'OPERADOR';
-        // normalizar mayúsculas
-        roleName = String(roleName).toUpperCase();
+        roleName = String(roleName).trim().toUpperCase();
+        // Permitir etiquetas del frontend y alias comunes
+        const roleAliases = {
+          'ADMINISTRADOR': 'ADMIN',
+          'ADMINISTRADOR DEL SISTEMA': 'ADMIN',
+          'JUEZ': 'JUEZ',
+          'SECRETARIO': 'SECRETARIO',
+          'SECRETARIO JUDICIAL': 'SECRETARIO',
+          'OPERADOR': 'OPERADOR',
+          'OPERADOR ADMINISTRATIVO': 'OPERADOR'
+        };
+        roleName = roleAliases[roleName] || roleName;
+
         const roleRow = await db('roles')
-          .whereRaw('UPPER(nombre) = ?', [roleName])
+          .whereRaw('UPPER(TRIM(nombre)) = ?', [roleName])
           .first();
-        if (!roleRow) {
-          throw createError('Rol no válido', 400);
+        let resolvedRole = roleRow;
+
+        // Si falta un rol estándar en la DB, crearlo para no bloquear el registro
+        if (!resolvedRole) {
+          const allowedRoles = ['ADMIN', 'JUEZ', 'SECRETARIO', 'OPERADOR'];
+          if (!allowedRoles.includes(roleName)) {
+            throw createError(`Rol no válido: ${roleName}`, 400);
+          }
+
+          const [newRoleId] = await db('roles').insert({ nombre: roleName });
+          resolvedRole = await db('roles').where({ id: newRoleId }).first();
         }
-        roleId = roleRow.id;
+
+        if (!resolvedRole) {
+          throw createError(`Rol no válido: ${roleName}`, 400);
+        }
+        roleId = resolvedRole.id;
       } else {
         const roleRow = await db('roles').where({ id: roleId }).first();
         if (!roleRow) {

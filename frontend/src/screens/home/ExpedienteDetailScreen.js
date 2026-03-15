@@ -10,6 +10,7 @@ import {
   RefreshControl,
   TextInput
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { expedientesApi } from '../../api/expedientes.api';
@@ -24,11 +25,15 @@ const ExpedienteDetailScreen = ({ route, navigation }) => {
   const [activeTab, setActiveTab] = useState('general');
   const scrollRef = useRef(null);
 
-  const goToDocumentos = () => {
-    setActiveTab('documentos');
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
     setTimeout(() => {
-      try { scrollRef.current && scrollRef.current.scrollTo({ y: 0, animated: true }); } catch {}
+      try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch {}
     }, 60);
+  };
+
+  const goToDocumentos = () => {
+    handleTabChange('documentos');
   };
 
   // Obtener datos del expediente
@@ -50,16 +55,24 @@ const ExpedienteDetailScreen = ({ route, navigation }) => {
   });
 
   // Obtener documentos del expediente (normalizado)
-  const { data: documentos } = useQuery({
+  const { data: documentos, refetch: refetchDocumentos } = useQuery({
     queryKey: ['documentos', id],
     queryFn: () => expedientesApi.getDocumentos(id),
     staleTime: 5 * 60 * 1000,
   });
 
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+      refetchAct();
+      refetchDocumentos();
+    }, [refetch, refetchAct, refetchDocumentos])
+  );
+
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    refetch().finally(() => setRefreshing(false));
-  }, [refetch]);
+    Promise.all([refetch(), refetchAct(), refetchDocumentos()]).finally(() => setRefreshing(false));
+  }, [refetch, refetchAct, refetchDocumentos]);
 
   const handleNuevaActuacion = () => {
     if (hasPermission('expedientes.write')) {
@@ -265,25 +278,73 @@ const ExpedienteDetailScreen = ({ route, navigation }) => {
             title="General"
             value="general"
             isActive={activeTab === 'general'}
-            onPress={() => setActiveTab('general')}
+            onPress={() => handleTabChange('general')}
           />
           <TabButton
             title="Actuaciones"
             value="actuaciones"
             isActive={activeTab === 'actuaciones'}
-            onPress={() => setActiveTab('actuaciones')}
+            onPress={() => handleTabChange('actuaciones')}
           />
           <TabButton
             title="Documentos"
             value="documentos"
             isActive={activeTab === 'documentos'}
-            onPress={() => setActiveTab('documentos')}
+            onPress={() => handleTabChange('documentos')}
           />
         </View>
 
         {/* Contenido de los tabs */}
         {activeTab === 'general' && (
           <View style={styles.tabContent}>
+            <View style={styles.overviewCard}>
+              <Text style={styles.overviewTitle}>Resumen general</Text>
+              <Text style={styles.overviewSubtitle}>
+                Esta pestaña resume el estado actual del expediente y te da accesos rápidos.
+              </Text>
+
+              <View style={styles.overviewGrid}>
+                <View style={styles.overviewItem}>
+                  <Text style={styles.overviewLabel}>Estado</Text>
+                  <Text style={styles.overviewValue}>{getStatusText(expediente.estado)}</Text>
+                </View>
+                <View style={styles.overviewItem}>
+                  <Text style={styles.overviewLabel}>Institución</Text>
+                  <Text style={styles.overviewValue}>{expediente.institucion_nombre || 'Sin institución'}</Text>
+                </View>
+                <View style={styles.overviewItem}>
+                  <Text style={styles.overviewLabel}>Creado</Text>
+                  <Text style={styles.overviewValue}>
+                    {new Date(expediente.created_at).toLocaleDateString('es-AR')}
+                  </Text>
+                </View>
+                <View style={styles.overviewItem}>
+                  <Text style={styles.overviewLabel}>Actualizado</Text>
+                  <Text style={styles.overviewValue}>
+                    {new Date(expediente.updated_at || expediente.created_at).toLocaleDateString('es-AR')}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.quickActionsContainer}>
+                <TouchableOpacity
+                  style={styles.quickActionButton}
+                  onPress={() => handleTabChange('actuaciones')}
+                >
+                  <Ionicons name="document-text" size={18} color={COLORS.primary} />
+                  <Text style={styles.quickActionText}>Ir a actuaciones</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickActionButton}
+                  onPress={() => handleTabChange('documentos')}
+                >
+                  <Ionicons name="folder" size={18} color={COLORS.secondary} />
+                  <Text style={styles.quickActionText}>Ir a documentos</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={styles.statsContainer}>
               <View style={styles.statCard}>
                 <Ionicons name="document-text" size={32} color={COLORS.primary} />
@@ -545,6 +606,74 @@ const styles = StyleSheet.create({
   tabContent: {
     paddingHorizontal: SPACING.screenPadding,
     paddingBottom: SPACING.xxl,
+  },
+
+  overviewCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.small,
+  },
+
+  overviewTitle: {
+    ...TYPOGRAPHY.h4,
+    color: COLORS.text.primary,
+    marginBottom: SPACING.xs,
+  },
+
+  overviewSubtitle: {
+    ...TYPOGRAPHY.body2,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING.md,
+  },
+
+  overviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -SPACING.xs,
+  },
+
+  overviewItem: {
+    width: '50%',
+    paddingHorizontal: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+
+  overviewLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.text.secondary,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+
+  overviewValue: {
+    ...TYPOGRAPHY.body1,
+    color: COLORS.text.primary,
+    fontWeight: '600',
+  },
+
+  quickActionsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+
+  quickActionText: {
+    ...TYPOGRAPHY.body2,
+    color: COLORS.text.primary,
+    fontWeight: '600',
+    marginLeft: SPACING.xs,
   },
   
   statsContainer: {

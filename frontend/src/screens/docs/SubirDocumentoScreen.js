@@ -37,6 +37,7 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
   const [expError, setExpError] = useState('');
   const [expResults, setExpResults] = useState([]);
   const [selectedExpediente, setSelectedExpediente] = useState(null);
+  const currentExpedienteId = selectedExpediente?.id || formData.expediente_id || expedienteId || '';
 
   const formatFileSize = (bytes) => {
     if (!bytes || Number.isNaN(Number(bytes))) return 'Tamaño desconocido';
@@ -63,7 +64,9 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
 
       setSelectedFile({
         ...asset,
+        file: asset.file ?? null,
         size: asset.size ?? asset.file?.size ?? null,
+        mimeType: asset.mimeType ?? asset.file?.type ?? null,
       });
       if (errors.file) {
         setErrors((prev) => ({ ...prev, file: '' }));
@@ -99,6 +102,39 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
     if (!match?.id) throw new Error('No se encontró un expediente que coincida con el dato ingresado.');
     return match.id;
   };
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const preloadExpediente = async () => {
+      if (!expedienteId || selectedExpediente?.id) {
+        return;
+      }
+
+      try {
+        const response = await expedientesApi.getExpediente(expedienteId);
+        const expediente = response?.data?.expediente || response?.expediente || response;
+
+        if (cancelled || !expediente?.id) {
+          return;
+        }
+
+        setSelectedExpediente(expediente);
+        setFormData((prev) => ({ ...prev, expediente_id: String(expediente.id) }));
+        setErrors((prev) => ({ ...prev, expediente_id: '' }));
+      } catch (error) {
+        if (!cancelled) {
+          setExpError('No se pudo cargar el expediente seleccionado.');
+        }
+      }
+    };
+
+    preloadExpediente();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expedienteId, selectedExpediente?.id]);
 
   // Abrir el selector automáticamente si no hay expediente preseleccionado
   React.useEffect(() => {
@@ -137,7 +173,7 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
       newErrors.file = 'Debe seleccionar un archivo';
     }
 
-    if (!selectedExpediente?.id) {
+    if (!currentExpedienteId) {
       newErrors.expediente_id = 'Debe seleccionar un expediente';
     }
 
@@ -152,8 +188,13 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
 
     setLoading(true);
     try {
-      if (!selectedExpediente?.id) throw new Error('Debe seleccionar un expediente');
-      const expedienteIdResuelto = selectedExpediente.id;
+      const expedienteIdResuelto = selectedExpediente?.id
+        || expedienteId
+        || await resolverExpedienteId(String(formData.expediente_id || ''));
+
+      if (!expedienteIdResuelto) {
+        throw new Error('Debe seleccionar un expediente');
+      }
 
       await documentosApi.subirDocumento({
         expedienteId: expedienteIdResuelto,
@@ -165,7 +206,12 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
         },
       });
 
-      await queryClient.invalidateQueries({ queryKey: ['documentos'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documentos', expedienteIdResuelto] }),
+        queryClient.invalidateQueries({ queryKey: ['actuaciones', expedienteIdResuelto] }),
+        queryClient.invalidateQueries({ queryKey: ['expediente', expedienteIdResuelto] }),
+        queryClient.invalidateQueries({ queryKey: ['documentos'] }),
+      ]);
 
       Alert.alert(
         'Éxito',
@@ -179,7 +225,11 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
       );
     } catch (error) {
       console.error('Error al subir documento:', error);
-      const message = error?.response?.data?.message || error?.message || 'Error al subir el documento';
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        'Error al subir el documento';
       Alert.alert('Error', message);
     } finally {
       setLoading(false);
@@ -311,7 +361,7 @@ const SubirDocumentoScreen = ({ navigation, route }) => {
               title="Subir Documento"
               onPress={handleSubmit}
               loading={loading}
-              disabled={loading || !selectedFile || !selectedExpediente}
+              disabled={loading}
               style={styles.submitButton}
             />
           </View>
